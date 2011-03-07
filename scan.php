@@ -96,7 +96,7 @@ class s3gallery {
 			if(!$row) {
 				//get the id for the parent
 				$parent_id = $this->find_dir($path, FALSE);
-				$sql = "INSERT INTO " . config::$dirsTable . " (bucket, dirname, parent_id, created, updated) VALUES ('" . $this->bucket. "', '$path', $parent_id, now(), now())";
+				$sql = "INSERT INTO " . config::$dirsTable . " (bucket, dirname, parent_id, created, updated) VALUES ('" . config::$bucket. "', '$path', $parent_id, now(), now())";
 				$this->insert_row($sql);
 			}
 			$prevPath = $path;
