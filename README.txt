@@ -18,3 +18,8 @@ This step is necessary to run each time you add files to your S3 bucket.
 It will create records in the database so the structure and filenames can be replciated for the gallery without having any local image files and without the need to get directory listings remotely.
 This is a command line tool, so it's simply:
 php scan.php
+
+TODO:
+1. Optionally compare the hash of each image to identify changed files on S3 and update the database accordingly
+2. Have the scan.php generate thumbnails
+3. Create the actual image gallery views
