@@ -9,6 +9,10 @@ I have included Donovan Schönknecht's PHP S3 class as part of this project.
 Please see the README.txt in lib/S3 for the requierments to use this class.
 Visit his site here: http://undesigned.org.za/
 
+IMPORTANT:
+You must make sure you have your AWS S3 security setup in a way that your image files are viewable from the web.
+Your best bet is probably a bucket policy - see here for more info: http://docs.amazonwebservices.com/AmazonS3/latest/dev/index.html?AccessPolicyLanguage_UseCases_s3_a.html
+
 Usage:
 Create a database with the schema in schema.sql.
 Copy config.inc.php to config.php and alter the values accordingly.
