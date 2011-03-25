@@ -35,6 +35,7 @@ class s3gallery {
 			//get all images with thumbnails
 			$sql = "SELECT i.*, t.name as thumb FROM " . config::$thumbsTable . " as t
 					INNER JOIN " . config::$imagesTable . " as i ON i.id = t.image_id
+					WHERE i.dir_id = $dir_id
 					ORDER BY i.name ASC";
 			$thumbs = $this->get_rows($sql);
 			echo "found ".count($thumbs)." pics with thumbnails<br />";

@@ -19,6 +19,14 @@ class s3gallery {
 	 */
 	public function buildThumbs() {
 		$db = $this->db_connect();
+
+//		$file = "IMG_04773312889087373588760.jpg";
+//		$exif = exif_read_data($file);
+//		$o = $exif["Orientation"];
+//		echo "orientation: ($o)\n";
+//		$this->createThumb($file,0);
+//		die;
+
 		$s3 = new S3(config::$awsAccessKey, config::$awsSecretKey);
 		
 		//get all images that don't have thumbnails from the local db
@@ -55,7 +63,7 @@ class s3gallery {
 					unlink($savefile);
 				}
 			
-				if($count>100) die;
+				if($count>200) die;
 			}				
 		}
 		return;
@@ -63,74 +71,78 @@ class s3gallery {
 
 	public function createThumb($image, $image_id) {
 		$parts = pathinfo($image);
-	    $thumbFile = $parts["dirname"]."/thumb.".$parts["filename"].".".$parts["extension"];
-	    if(file_exists($thumbFile)) {
-	    	echo "Thumbnail for $image already exists, updating the database only..";
-	    	$sql = "INSERT INTO " . config::$thumbsTable . " (name, image_id, created, updated)
-					VALUES ('$thumbFile', $image_id, now(), now())";
+		$thumbFile = $parts["dirname"]."/thumb.".$parts["filename"].".".$parts["extension"];
+		if(file_exists($thumbFile)) {
+			echo "Thumbnail for $image already exists, updating the database only..";
+			$sql = "INSERT INTO " . config::$thumbsTable . " (name, image_id, created, updated)
+				VALUES ('$thumbFile', $image_id, now(), now())";
 			$result = $this->insert_row($sql);
 			echo "done.\n";
-	    } else {
-	    	echo "Creating thumbnail for {$image} to {$thumbFile}..";
-		    
-		    // load image and get image size
-		    $img = imagecreatefromjpeg($image);
-		    $width = imagesx( $img );
-		    $height = imagesy( $img );
+		} else {
+			echo "Creating thumbnail for {$image} to {$thumbFile}..";
+			// load image and get image size
+			$img = imagecreatefromjpeg($image);
+			$width = imagesx( $img );
+			$height = imagesy( $img );
+	
+			// calculate thumbnail size
+			$new_width = config::$thumbWidth;
+			$new_height = floor( $height * ( config::$thumbWidth / $width ) );
 		
-		    // calculate thumbnail size
-		    $new_width = config::$thumbWidth;
-		    $new_height = floor( $height * ( config::$thumbWidth / $width ) );
+			// create a new temporary image
+			$tmp_img = imagecreatetruecolor( $new_width, $new_height );
 		
-		    // create a new temporary image
-		    $tmp_img = imagecreatetruecolor( $new_width, $new_height );
+			// copy and resize old image into new image 
+			imagecopyresized( $tmp_img, $img, 0, 0, 0, 0, $new_width, $new_height, $width, $height );
 		
-		    // copy and resize old image into new image 
-		    imagecopyresized( $tmp_img, $img, 0, 0, 0, 0, $new_width, $new_height, $width, $height );
+			//need rotation? http://www.php.net/manual/en/function.exif-read-data.php#76964
+			$exif = exif_read_data($image);
+			if(isset($exif['Orientation'])) {
+				$ort = $exif['Orientation'];
+				echo "{$ort}\n";
+				switch($ort)
+				{
+					case 1: // nothing
+					break;
 		
-		    //need rotation? http://www.php.net/manual/en/function.exif-read-data.php#76964
-		    $exif = exif_read_data($image);
-		    echo "looking for orientation...";
-		    if(isset($exif['Orientation'])) {
-			    $ort = $exif['Orientation'];
-			    echo "{$ort}\n";
-			    switch($ort)
-			    {
-			        case 1: // nothing
-			        break;
-			
-			        case 2: // horizontal flip
-			        break;
-			                                
-			        case 3: // 180 rotate left
-			            imagerotate($tmp_img,180,0);
-			        break;
-			                    
-			        case 4: // vertical flip
-			        break;
-			                
-			        case 5: // vertical flip + 90 rotate right
-			        break;
-			                
-			        case 6: // 90 rotate right
-			            imagerotate($tmp_img,270,0);
-			        break;
-			                
-			        case 7: // horizontal flip + 90 rotate right
-			        break;
-			                
-			        case 8:    // 90 rotate left
-			        	imagerotate($tmp_img,90,0);
-			        break;
-			    }
-		    }
-		    // save thumbnail into a file
-		    imagejpeg( $tmp_img, $thumbFile );
-		    $sql = "INSERT INTO " . config::$thumbsTable . " (name, image_id, created, updated)
-					VALUES ('$thumbFile', $image_id, now(), now())";
+					case 2: // horizontal flip
+					break;
+						
+					case 3: // 180 rotate left
+						echo "rotating 180 degrees..";
+						$tmp_img = imagerotate($tmp_img,180,0);
+					break;
+				    
+					case 4: // vertical flip
+					break;
+				
+					case 5: // vertical flip + 90 rotate right
+					break;
+					
+
+					case 6: // 90 rotate right
+						echo "rotating 90 degrees right..";
+						$tmp_img = imagerotate($tmp_img,270,0);
+					break;
+				
+					case 7: // horizontal flip + 90 rotate right
+					break;
+				
+					case 8:    // 90 rotate left
+						echo "rotating 90 degrees left..";
+						$tmp_img = imagerotate($tmp_img,90,0);
+					break;
+				}
+			}
+
+			// save thumbnail into a file
+			imagejpeg( $tmp_img, $thumbFile );
+			$sql = "INSERT INTO " . config::$thumbsTable . " (name, image_id, created, updated)
+				VALUES ('$thumbFile', $image_id, now(), now())";
 			$result = $this->insert_row($sql);
-		    echo "done.\n";
-	    }
+		
+			echo "done.\n";
+		}
 	}
 	public function insert_row($sql) {
 		mysql_query($sql);
@@ -152,84 +164,75 @@ class s3gallery {
 		return $rows;
 	}	
 
-	public function test() {
-		$db = $this->db_connect();
-		$files = array("pictures/1980","pictures/1980/01","pictures/1980/02","pictures/2003","pictures/2003/01","pictures/2003/01/23/35","pictures/2004/12/picnic/12.jpg");
-		foreach($files as $file) {
-			$result = $this->find_dir($file);
-		}
-	}
-
-	
 	
 	/** got this from http://php.net/manual/en/function.imagerotate.php **/
 	public function rotateImage ($image, $angle)
-    {
-        if ( ($angle < 0) || ($angle > 360) )
-        {
-            exit ("Error, angle passed out of range: [0,360]");
-        }
-        
-        $width    = imagesx ($image);
-        $height    = imagesy ($image);
-        
-        $dstImage = imagecreatetruecolor ($width, $height);
-        
-        if ( ($angle == 0) || ($angle == 360) )
-        {
-            // Just copy image to output:
-            imagecopy ($dstImage, $image, 0, 0, 0, 0, $width, $height);
-        }
-        else
-        {
-            $centerX = floor ($width / 2);
-            $centerY = floor ($height / 2);
-            
-            // Run on all pixels of the destination image and fill them:
-            for ($dstImageX = 0; $dstImageX < $width; $dstImageX++)
-            {
-                for ($dstImageY = 0; $dstImageY < $height; $dstImageY++)
-                {
-                    // Calculate pixel coordinate in coordinate system centered at the image center:
-                    $x = $dstImageX - $centerX;
-                    $y = $centerY - $dstImageY;
-                    
-                    if ( ($x == 0) && ($y == 0) )
-                    {
-                        // We are in the image center, this pixel should be copied as is:
-                        $srcImageX = $x;
-                        $srcImageY = $y;
-                    }
-                    else
-                    {
-                        $r = sqrt ($x * $x + $y * $y); // radius - absolute distance of the current point from image center
+	{
+		if ( ($angle < 0) || ($angle > 360) )
+		{
+			exit ("Error, angle passed out of range: [0,360]");
+		}
 
-                        $curAngle = asin ($y / $r); // angle of the current point [rad]
-                        
-                        if ($x < 0)
-                        {
-                            $curAngle = pi () - $curAngle;
-                        }
-                        
-                        $newAngle = $curAngle + $angle * pi () / 180; // new angle [rad]
+		$width    = imagesx ($image);
+		$height    = imagesy ($image);
 
-                        // Calculate new point coordinates (after rotation) in coordinate system at image center
-                        $newXRel = floor ($r * cos ($newAngle));
-                        $newYRel = floor ($r * sin ($newAngle));
-                        
-                        // Convert to image absolute coordinates
-                        $srcImageX = $newXRel + $centerX;
-                        $srcImageY = $centerY - $newYRel;
-                    }
-                    
-                    $pixelColor = imagecolorat  ($image, $srcImageX, $srcImageY); // get source pixel color
-                    
-                    imagesetpixel ($dstImage, $dstImageX, $dstImageY, $pixelColor); // write destination pixel
-                }
-            }
-        }
-        
-        return $dstImage;
-    }
+		$dstImage = imagecreatetruecolor ($width, $height);
+
+		if ( ($angle == 0) || ($angle == 360) )
+		{
+			// Just copy image to output:
+			imagecopy ($dstImage, $image, 0, 0, 0, 0, $width, $height);
+		}
+		else
+		{
+			$centerX = floor ($width / 2);
+			$centerY = floor ($height / 2);
+
+			// Run on all pixels of the destination image and fill them:
+			for ($dstImageX = 0; $dstImageX < $width; $dstImageX++)
+			{
+				for ($dstImageY = 0; $dstImageY < $height; $dstImageY++)
+				{
+					// Calculate pixel coordinate in coordinate system centered at the image center:
+					$x = $dstImageX - $centerX;
+					$y = $centerY - $dstImageY;
+
+					if ( ($x == 0) && ($y == 0) )
+					{
+						// We are in the image center, this pixel should be copied as is:
+						$srcImageX = $x;
+						$srcImageY = $y;
+					}
+					else
+					{
+						$r = sqrt ($x * $x + $y * $y); // radius - absolute distance of the current point from image center
+
+						$curAngle = asin ($y / $r); // angle of the current point [rad]
+
+						if ($x < 0)
+						{
+							$curAngle = pi () - $curAngle;
+						}
+
+						$newAngle = $curAngle + $angle * pi () / 180; // new angle [rad]
+
+						// Calculate new point coordinates (after rotation) in coordinate system at image center
+						$newXRel = floor ($r * cos ($newAngle));
+						$newYRel = floor ($r * sin ($newAngle));
+
+						// Convert to image absolute coordinates
+						$srcImageX = $newXRel + $centerX;
+						$srcImageY = $centerY - $newYRel;
+					}
+
+					$pixelColor = imagecolorat  ($image, $srcImageX, $srcImageY); // get source pixel color
+
+					imagesetpixel ($dstImage, $dstImageX, $dstImageY, $pixelColor); // write destination pixel
+				}
+			}
+		}
+
+		return $dstImage;
+	}
 
 }

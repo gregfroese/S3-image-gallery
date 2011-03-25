@@ -23,7 +23,16 @@ It will create records in the database so the structure and filenames can be rep
 This is a command line tool, so it's simply:
 php scan.php
 
+Generating thumbnails:
+This is a command line task as well as it could take a long time to run.
+php buildThumbs.php
+This will go through all the images in your database that don't have a corresonding thumbnail record and check for the existance of a thumbnail image (currently locally only). If none is found, it will create one and add a record to the database.  If one is found but there is no record in the database, a record is added.
+
 TODO:
 1. Optionally compare the hash of each image to identify changed files on S3 and update the database accordingly
-2. Have the scan.php generate thumbnails
+2. Generate thumbnails
+	a. DONE: generate thumbnails by finding files in the database and retrieving them to generate the thumbnail
+	b. Optionally push the thumbnails back up to S3
 3. Create the actual image gallery views
+	a. Optionally use local thumbnails and images for all links
+
