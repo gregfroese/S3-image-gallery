@@ -32,22 +32,44 @@ class s3gallery {
 
 	public function show_images($dir_id) {
 		?><div id="maincol"><?php
-			$sql = "SELECT * FROM " . config::$imagesTable . " WHERE dir_id = $dir_id ORDER BY name ASC";
-			echo "sql: $sql<br />";
+			//get all images with thumbnails
+			$sql = "SELECT i.*, t.name as thumb FROM " . config::$thumbsTable . " as t
+					INNER JOIN " . config::$imagesTable . " as i ON i.id = t.image_id
+					ORDER BY i.name ASC";
+			$thumbs = $this->get_rows($sql);
+			echo "found ".count($thumbs)." pics with thumbnails<br />";
+//			$sql = "SELECT * FROM " . config::$imagesTable . " WHERE dir_id = $dir_id ORDER BY name ASC";
+			$sql = "SELECT i.* as thumb FROM " . config::$imagesTable . " as i
+					LEFT JOIN " . config::$thumbsTable . " as t ON i.id = t.image_id
+					WHERE t.id is null AND i.dir_id = $dir_id";
+//			echo "sql: $sql<br />";
 			$rows = $this->get_rows($sql);
+			if($rows) {
+				echo "There are ".count($rows)." images in this directory without thumbnails.  Please run 'php buildThumbs.php'<br />";
+			}
 			$count = 0;
 			$imagesPerRow = config::$imagesPerRow;
 			?><table id="imageTable"><?php
-				foreach($rows as $row) {
-					if($count % $imagesPerRow == 0) {
-						if($count > 0) {
-							?></tr><tr><?php
-						} else {
-							?><tr><?php
+				foreach($thumbs as $row) {
+					$extension = substr($row['name'],-3);
+					if(in_array($extension, config::$valid_extensions)) { //don't show non-images, specifically sub directories
+						if($count % $imagesPerRow == 0) {
+							if($count > 0) {
+								?></tr><tr><?php
+							} else {
+								?><tr><?php
+							}
 						}
+						$count++;
+						if(config::$useLocalThumbs) {
+							$thumbPath = "";
+						} else {
+							$thumbPath = config::$awsURL;
+						}
+						?><td><a href="<?=config::$awsURL.$row["name"]?>">
+							<img src="<?=$thumbPath.$row["thumb"]?>">
+						</a></td><?php
 					}
-					$count++;
-					?><td><a href="<?=config::$awsURL.$row["name"]?>">pic</a></td><?php
 				}
 			?></tr></table></div><?php
 	}
